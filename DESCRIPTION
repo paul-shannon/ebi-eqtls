@@ -1,0 +1,13 @@
+Package: ebi.eqtls
+Type: Package
+Title: ebi.eqtls
+Version: 1.0.1
+Date: 2022-06-06
+Author: Paul Shannon
+Maintainer: Paul Shannon<paul.thurmond.shannon@gmail.com>
+Imports: AnnotationDbi, EnsDb.Hsapiens.v79
+Description: a minimal but full-featured package upon which to model a documented, tested R6 package
+Depends: R (>= 4.1.0), R6
+License: MIT
+Encoding: UTF-8
+RoxygenNote: 7.2.0
