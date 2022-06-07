@@ -2,5 +2,7 @@
 
 export(ebi.eqtls)
 import(EnsDb.Hsapiens.v79)
+import(GenomicRanges)
+import(SNPlocs.Hsapiens.dbSNP155.GRCh38)
 import(catalogueR)
 import(plyr)

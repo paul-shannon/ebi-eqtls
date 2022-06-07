@@ -6,7 +6,8 @@
 #' @import catalogueR
 #' @import EnsDb.Hsapiens.v79
 #' @import plyr
-# @importFrom AnnotationDbi mapIds
+#' @import SNPlocs.Hsapiens.dbSNP155.GRCh38
+#' @import GenomicRanges
 #'
 #' @export
 
@@ -68,7 +69,7 @@ ebi.eqtls = R6Class("ebi.eqtls",
                        }
                    }, # tryCatch main block
                 error = function(e){
-                    message(sprintf("eQTL_Catalogue.fetch failed on study %s", study.d))
+                    message(sprintf("eQTL_Catalogue.fetch failed on study %s", study.id))
                     print(e)
                 }) # tryCatch conclusion
                } # for study.id
@@ -79,18 +80,21 @@ ebi.eqtls = R6Class("ebi.eqtls",
                 return(data.frame())
             new.order <- order(tbl.out$pvalue.QTL, decreasing=FALSE)
             tbl.out <- as.data.frame(tbl.out[new.order,])
-            coi <- c("rsid.QTL", "pvalue.QTL", "gene_id.QTL", "an.QTL", "beta.QTL", "id")
             if(simplify){
+                coi <- c("rsid.QTL", "pvalue.QTL", "gene_id.QTL", "an.QTL", "beta.QTL", "id",
+                         "chromosome.QTL", "position.QTL")
                 tbl.out <- tbl.out[, coi]
-                colnames(tbl.out) <- c("rsid", "pvalue", "gene", "total.alleles", "beta", "id")
+                colnames(tbl.out) <- c("rsid", "pvalue", "gene", "total.alleles", "beta", "id", "chrom", "hg38")
+            } else {  # even though not simplifying, for uniformity we need "gene" as the column name
+                colnames(tbl.out)[grep("gene_id.QTL", colnames(tbl.out))] <- "gene"
                 }
-            if(!is.na(targetGene)){
+            if(!is.na(targetGene)){  # find its ensg, subset on that, then replace
                 ensg <- as.character(AnnotationDbi::mapIds(EnsDb.Hsapiens.v79, targetGene, "GENEID", "SYMBOL"))
                 if(!ensg %in% tbl.out$gene){   # these eQTLs are not for the target gene
                     message(sprintf("ADv$geteQTLsByLocationAndStudyID, %d eqtls found, but none for %s",
                                     nrow(tbl.out), targetGene))
                     return(data.frame())
-                }
+                    }
                 tbl.out <- subset(tbl.out, gene==ensg)
                 tbl.out$gene <- targetGene
                 message(sprintf("--- %d variants for %s, corrected from %s", nrow(tbl.out), targetGene, ensg))
@@ -106,11 +110,12 @@ ebi.eqtls = R6Class("ebi.eqtls",
             invisible(as.data.frame(tbl.out))
             }, # get.eQTLsByLocationAndStudyID
 
+        #---------------------------------------------------------------------------------------------------
         #' @description gets all eQTLs in the region, chunking requests as specified
         #' @param chrom character
         #' @param start numeric
         #' @param end numeric
-        #' @param studyIDs character from the catalog's unique_id field
+        #' @param study character from the catalog's unique_id field
         #' @param simplify logical return the full EBI table, or just a few crucial columsnn
         #' @param chunk.size integer often 10000, below the limit at which EBI REST fails
         #' @return data.frame
@@ -141,7 +146,47 @@ ebi.eqtls = R6Class("ebi.eqtls",
                 tbl <- do.call(rbind, tbls)
                 } # else
             invisible(tbl)
-            } # fetch.eqtls.in.chunks
+            }, # fetch.eqtls.in.chunks
+        #' @description create a table of hg19 and hg38 locs for all rsids in region
+        #' @param chrom character
+        #' @param start numeric
+        #' @param end numeric
+        create.snpLocs.table = function(chrom, start, end){
+            require(GenomicRanges)
+            require(SNPlocs.Hsapiens.dbSNP155.GRCh38)
+            message(sprintf("initializing hg38 snpLocs, may take a minute"))
+            t1 <- system.time(x <- snpsById(SNPlocs.Hsapiens.dbSNP155.GRCh38, "rs769450"))
+            message(sprintf("dbSNP155 hg38: %5.2f", t1[["elapsed"]]))
+
+            gr <- GRanges(seqnames=chrom, #sub("chr", "", chromosome),
+                          IRanges(start=start, end=end))
+            seqlevelsStyle(gr) <- "NCBI"
+            gr.snps <- snpsByOverlaps(SNPlocs.Hsapiens.dbSNP155.GRCh38, gr)
+            seqlevelsStyle(gr.snps) <- "UCSC"   # needed for rtracklayer liftover
+            chain.file <- "hg38ToHg19.over.chain.gz"
+            if(!file.exists(chain.file)){
+                system(sprintf("curl -O http://hgdownload.soe.ucsc.edu/goldenPath/hg38/liftOver/%s",
+                               chain.file))
+                system(sprintf("gunzip %s", chain.file))
+                }
+            chain <- import.chain(sub(".gz", "", chain.file, fixed=TRUE))
+            x <- liftOver(gr.snps, chain)
+            gr.hg19 <- unlist(x)
+            tbl.snpLocs.hg19 <- as.data.frame(gr.hg19)[, c("seqnames", "start", "RefSNP_id")]
+            colnames(tbl.snpLocs.hg19) <- c("chrom", "hg19", "rsid")
+
+            tbl.snpLocs.hg38 <- as.data.frame(gr.snps)[, c(1,2,4)]
+            colnames(tbl.snpLocs.hg38) <- c("chrom", "hg38", "rsid")
+            tbl.snpLocs.hg38$chrom <- as.character(tbl.snpLocs.hg38$chrom)
+            dim(tbl.snpLocs.hg38)
+
+            tbl.snpLocs <- merge(tbl.snpLocs.hg38, tbl.snpLocs.hg19[, c("rsid", "hg19")], by=c("rsid"), all=TRUE)
+            rownames(tbl.snpLocs) <- tbl.snpLocs$rsid
+            coi <- c("chrom", "hg19", "hg38", "rsid")
+            tbl.snpLocs <- tbl.snpLocs[, coi]
+            rownames(tbl.snpLocs) <- NULL
+            tbl.snpLocs
+            } # create.snpLocs.table
         #----------------------------------------------------------------------------------------------------
        ) # public
 

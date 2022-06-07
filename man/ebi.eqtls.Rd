@@ -14,6 +14,7 @@ A template for building documented, tested R6 classes
 \item \href{#method-ebi.eqtls-getCatalog}{\code{ebi.eqtls$getCatalog()}}
 \item \href{#method-ebi.eqtls-get.eQTLsByLocationAndStudyID}{\code{ebi.eqtls$get.eQTLsByLocationAndStudyID()}}
 \item \href{#method-ebi.eqtls-fetch.eqtls.in.chunks}{\code{ebi.eqtls$fetch.eqtls.in.chunks()}}
+\item \href{#method-ebi.eqtls-create.snpLocs.table}{\code{ebi.eqtls$create.snpLocs.table()}}
 \item \href{#method-ebi.eqtls-clone}{\code{ebi.eqtls$clone()}}
 }
 }
@@ -118,16 +119,37 @@ gets all eQTLs in the region, chunking requests as specified
 
 \item{\code{end}}{numeric}
 
+\item{\code{study}}{character from the catalog's unique_id field}
+
 \item{\code{simplify}}{logical return the full EBI table, or just a few crucial columsnn}
 
 \item{\code{chunk.size}}{integer often 10000, below the limit at which EBI REST fails}
-
-\item{\code{studyIDs}}{character from the catalog's unique_id field}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
 data.frame
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-ebi.eqtls-create.snpLocs.table"></a>}}
+\if{latex}{\out{\hypertarget{method-ebi.eqtls-create.snpLocs.table}{}}}
+\subsection{Method \code{create.snpLocs.table()}}{
+create a table of hg19 and hg38 locs for all rsids in region
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{ebi.eqtls$create.snpLocs.table(chrom, start, end)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{chrom}}{character}
+
+\item{\code{start}}{numeric}
+
+\item{\code{end}}{numeric}
+}
+\if{html}{\out{</div>}}
 }
 }
 \if{html}{\out{<hr>}}
